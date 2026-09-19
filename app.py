@@ -11,8 +11,8 @@ st.set_page_config(
 st.title("🚗 Comparador de Equipos de Transporte por Placa")
 st.write(
     "Sube tus archivos, selecciona la columna de placa y el sistema limpiará"
-    " automáticamente los prefijos (como C- o RE-) para comparar los últimos 5"
-    " caracteres."
+    " automáticamente los guiones y espacios para comparar toda la placa de"
+    " forma exacta."
 )
 
 col1, col2 = st.columns(2)
@@ -68,12 +68,20 @@ if archivo_origen is not None and archivo_destino is not None:
     df_o = df_origen.copy()
     df_d = df_destino.copy()
 
-    # Limpieza: extraer los últimos 5 caracteres
+    # LIMPIEZA: Tomar toda la placa, pasar a mayúsculas, quitar espacios y eliminar guiones (-)
     df_o["_llave_limpia"] = (
-        df_o[llave_origen].astype(str).str.strip().str[-5:]
+        df_o[llave_origen]
+        .astype(str)
+        .str.upper()
+        .str.replace("-", "", regex=False)
+        .str.strip()
     )
     df_d["_llave_limpia"] = (
-        df_d[llave_destino].astype(str).str.strip().str[-5:]
+        df_d[llave_destino]
+        .astype(str)
+        .str.upper()
+        .str.replace("-", "", regex=False)
+        .str.strip()
     )
 
     comparacion = pd.merge(
@@ -134,9 +142,14 @@ if archivo_origen is not None and archivo_destino is not None:
       m3.metric("Con Diferencias", 0)
     m4.metric("Placas Ausentes en Origen", len(eliminados_registros))
 
-    # Pestañas con detalle (incluyendo la de coincidencias)
+    # Pestañas con detalle
     tab1, tab2, tab3, tab4 = st.tabs(
-        ["Nuevos Registros", "Coincidencias (Match)", "Actualizaciones / Diferencias", "Ausentes en Origen"]
+        [
+            "Nuevos Registros",
+            "Coincidencias (Match)",
+            "Actualizaciones / Diferencias",
+            "Ausentes en Origen",
+        ]
     )
     with tab1:
       st.dataframe(nuevos_registros)
