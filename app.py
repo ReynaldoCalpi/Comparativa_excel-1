@@ -10,9 +10,9 @@ st.set_page_config(
 
 st.title("🚗 Comparador de Equipos de Transporte por Placa")
 st.write(
-    "Sube tus archivos, selecciona la columna de placa de cada uno y el sistema"
-    " limpiará automáticamente los prefijos (como C- o RE-) para comparar"
-    " únicamente los últimos 5 caracteres."
+    "Sube tus archivos, selecciona la columna de placa y el sistema limpiará"
+    " automáticamente los prefijos (como C- o RE-) para comparar los últimos 5"
+    " caracteres."
 )
 
 col1, col2 = st.columns(2)
@@ -56,7 +56,6 @@ if archivo_origen is not None and archivo_destino is not None:
         "Columna de Placa en **Destino**:", columnas_destino
     )
 
-  # Columna opcional para auditar cambios de valor
   columnas_comunes = list(
       set(df_origen.columns).intersection(set(df_destino.columns))
   )
@@ -66,11 +65,10 @@ if archivo_origen is not None and archivo_destino is not None:
   )
 
   if st.button("Ejecutar Comparación por Placas", type="primary"):
-    # Copiar dataframes para procesarlos de manera limpia
     df_o = df_origen.copy()
     df_d = df_destino.copy()
 
-    # LIMPIEZA CLAVE: Convertir a texto, eliminar espacios y extraer los últimos 5 caracteres
+    # Limpieza: extraer los últimos 5 caracteres
     df_o["_llave_limpia"] = (
         df_o[llave_origen].astype(str).str.strip().str[-5:]
     )
@@ -78,7 +76,6 @@ if archivo_origen is not None and archivo_destino is not None:
         df_d[llave_destino].astype(str).str.strip().str[-5:]
     )
 
-    # Realizar el merge usando la llave limpia de 5 caracteres
     comparacion = pd.merge(
         df_o,
         df_d,
@@ -114,42 +111,47 @@ if archivo_origen is not None and archivo_destino is not None:
         c.replace("_destino", "") for c in eliminados_registros.columns
     ]
 
-    # C. Registros comunes y auditoría segura de cambios
+    # C. Registros que SÍ hacen match (comunes)
     comunes = comparacion[comparacion["_merge"] == "both"].copy()
-    cambios = pd.DataFrame()
 
+    # D. Auditoría de cambios dentro de los comunes
+    cambios = pd.DataFrame()
     if columna_a_revisar != "Ninguna":
       col_orig_rev = f"{columna_a_revisar}_origen"
       col_dest_rev = f"{columna_a_revisar}_destino"
       if col_orig_rev in comunes.columns and col_dest_rev in comunes.columns:
         cambios = comunes[comunes[col_orig_rev] != comunes[col_dest_rev]]
 
-    # Mostrar Métricas de Resultados
+    # Métricas de Resultados
     st.divider()
     st.subheader("📈 Resultados de la Comparación de Placas")
-    m1, m2, m3 = st.columns(3)
+    m1, m2, m3, m4 = st.columns(4)
     m1.metric("Placas Nuevas (Insertar)", len(nuevos_registros))
+    m2.metric("Coincidencias (Match)", len(comunes))
     if columna_a_revisar != "Ninguna":
-      m2.metric(f"Con Diferencias en '{columna_a_revisar}'", len(cambios))
+      m3.metric(f"Con Diferencias", len(cambios))
     else:
-      m2.metric("Con Diferencias", 0)
-    m3.metric("Placas Ausentes en Origen", len(eliminados_registros))
+      m3.metric("Con Diferencias", 0)
+    m4.metric("Placas Ausentes en Origen", len(eliminados_registros))
 
-    # Pestañas con detalle
-    tab1, tab2, tab3 = st.tabs(
-        ["Nuevos Registros", "Actualizaciones", "Ausentes en Origen"]
+    # Pestañas con detalle (incluyendo la de coincidencias)
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["Nuevos Registros", "Coincidencias (Match)", "Actualizaciones / Diferencias", "Ausentes en Origen"]
     )
     with tab1:
       st.dataframe(nuevos_registros)
     with tab2:
-      st.dataframe(cambios)
+      st.dataframe(comunes)
     with tab3:
+      st.dataframe(cambios)
+    with tab4:
       st.dataframe(eliminados_registros)
 
-    # Generar archivo de descarga Excel
+    # Generar archivo Excel de salida con todas las hojas
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
       nuevos_registros.to_excel(writer, sheet_name="Nuevos", index=False)
+      comunes.to_excel(writer, sheet_name="Coincidencias_Match", index=False)
       if not cambios.empty:
         cambios.to_excel(writer, sheet_name="Actualizaciones", index=False)
       eliminados_registros.to_excel(
@@ -158,9 +160,9 @@ if archivo_origen is not None and archivo_destino is not None:
     processed_data = output.getvalue()
 
     st.download_button(
-        label="📥 Descargar Reporte de Diferencias en Excel",
+        label="📥 Descargar Reporte Completo en Excel (Incluye Match)",
         data=processed_data,
-        file_name="reporte_placas_diferencias.xlsx",
+        file_name="reporte_placas_completo.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
